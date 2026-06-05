@@ -1,0 +1,172 @@
+import { useState, useRef } from "react"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Upload, FileText, CheckCircle, AlertCircle, Trash2 } from "lucide-react"
+import { useAuctionStore } from "@/store/auctionStore"
+import { parseAuctionatorLua, parseAuctionCSV } from "@/lib/luaParser"
+import type { AuctionEntry, ImportSession } from "@/types/auction"
+import { formatCopper } from "@/lib/money"
+
+export function AuctionImportPage() {
+  const { sessions, useDemoData, toggleDemoData, clearAll, addEntries, entries } = useAuctionStore()
+  const [importing, setImporting] = useState(false)
+  const [lastResult, setLastResult] = useState<{ success: boolean; message: string; details?: string } | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  async function handleFile(file: File) {
+    setImporting(true)
+    setLastResult(null)
+    try {
+      const content = await file.text()
+      let importedEntries: AuctionEntry[] = []
+      let realm: string | null = null
+
+      if (file.name.endsWith('.lua') || file.name.endsWith('.LUA')) {
+        const parsed = parseAuctionatorLua(content)
+        realm = parsed.realm
+        importedEntries = parsed.entries
+
+        if (importedEntries.length === 0) {
+          const detail = parsed.parseErrors.length > 0 ? parsed.parseErrors.join('\n') : undefined
+          setLastResult({ success: false, message: 'No items found. Try a TSV export.', details: detail })
+          setImporting(false)
+          return
+        }
+        if (parsed.parseErrors.length > 0) {
+          // Show errors but continue if we got some entries
+          console.warn('LUA parse warnings:', parsed.parseErrors)
+        }
+      } else {
+        importedEntries = parseAuctionCSV(content)
+      }
+
+      if (importedEntries.length === 0) {
+        setLastResult({ success: false, message: 'No auction entries found in file. Try a CSV/TSV format instead.' })
+        setImporting(false)
+        return
+      }
+
+      const session: ImportSession = {
+        id: `session-${Date.now()}`,
+        fileName: file.name,
+        importDate: new Date().toISOString(),
+        realm,
+        entryCount: importedEntries.length,
+      }
+
+      addEntries(importedEntries, session)
+      setLastResult({ success: true, message: `Imported ${importedEntries.length} entries from ${file.name}` })
+    } catch (e) {
+      setLastResult({ success: false, message: `Error reading file: ${e}` })
+    }
+    setImporting(false)
+  }
+
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) handleFile(file)
+    e.target.value = ''
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault()
+    const file = e.dataTransfer.files[0]
+    if (file) handleFile(file)
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Auction Import</h1>
+        <p className="text-muted-foreground text-sm mt-1">Import your Auctionator saved variables or CSV export</p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Import File</CardTitle>
+          <CardDescription>
+            Supported: Auctionator.lua (saved variables) or TSV/CSV with columns: item, unit price, quantity, seller
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div
+            className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
+            onDragOver={e => e.preventDefault()}
+            onDrop={onDrop}
+            onClick={() => fileRef.current?.click()}
+          >
+            <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+            <p className="font-medium">Drop file here or click to browse</p>
+            <p className="text-sm text-muted-foreground mt-1">.lua, .csv, .tsv files</p>
+          </div>
+          <input ref={fileRef} type="file" accept=".lua,.csv,.tsv,.txt" className="hidden" onChange={onFileChange} />
+
+          {importing && <p className="text-sm text-muted-foreground">Importing...</p>}
+
+          {lastResult && (
+            <div className={`flex items-start gap-2 p-3 rounded-md text-sm ${lastResult.success ? 'bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200' : 'bg-destructive/10 text-destructive'}`}>
+              {lastResult.success ? <CheckCircle className="h-4 w-4 mt-0.5 shrink-0" /> : <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />}
+              <div>
+                <p className="font-medium">{lastResult.message}</p>
+                {lastResult.details && <pre className="mt-1 text-xs whitespace-pre-wrap">{lastResult.details}</pre>}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>CSV Format Reference</CardTitle>
+          <CardDescription>If you want to manually create a price list, use this TSV format:</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <pre className="text-xs bg-muted p-3 rounded-md overflow-auto">
+{`item\tunit price\tquantity\tseller\nCopper Ore\t300\t20\tMiner1\nTin Ore\t450\t20\tMiner2`}
+          </pre>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Import History</CardTitle>
+            <CardDescription>{sessions.length} import sessions · {entries.length} total entries</CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={toggleDemoData}>
+              {useDemoData ? 'Hide Demo Data' : 'Show Demo Data'}
+            </Button>
+            {entries.length > 0 && (
+              <Button variant="destructive" size="sm" onClick={() => { if (confirm('Clear all imported data?')) clearAll() }}>
+                <Trash2 className="h-4 w-4 mr-1" /> Clear All
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {sessions.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No imports yet</p>
+          ) : (
+            <div className="space-y-2">
+              {[...sessions].reverse().map(session => (
+                <div key={session.id} className="flex items-center justify-between p-3 rounded-md border text-sm">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">{session.fileName}</span>
+                    {session.realm && <Badge variant="outline">{session.realm}</Badge>}
+                  </div>
+                  <div className="flex items-center gap-3 text-muted-foreground">
+                    <span>{session.entryCount} entries</span>
+                    <span>{new Date(session.importDate).toLocaleDateString()}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
