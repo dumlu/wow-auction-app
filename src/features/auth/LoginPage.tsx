@@ -82,6 +82,10 @@ export function LoginPage({ isDark, onToggleDark }: LoginPageProps) {
             {loading ? 'Signing in…' : 'Sign in'}
           </Button>
         </form>
+
+        <p className="text-center text-xs text-muted-foreground">
+          Build: {new Date(__BUILD_DATE__).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' })}
+        </p>
       </div>
     </div>
   )
