@@ -9,6 +9,7 @@ import { ProfessionLevelingPage } from "@/features/profession-leveling/Professio
 import { ProspectingPage } from "@/features/prospecting/ProspectingPage"
 import { ThemeSettingsPage } from "@/features/theme-settings/ThemeSettingsPage"
 import { LoginPage } from "@/features/auth/LoginPage"
+import { UserManagementPage } from "@/features/user-management/UserManagementPage"
 import { useAuthStore } from "@/store/authStore"
 import { storageGet, storageSet } from "@/lib/storage"
 
@@ -42,6 +43,7 @@ export default function App() {
     'profession-leveling': <ProfessionLevelingPage />,
     prospecting: <ProspectingPage />,
     'theme-settings': <ThemeSettingsPage isDark={isDark} />,
+    'user-management': <UserManagementPage />,
   }
 
   return (

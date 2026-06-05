@@ -8,6 +8,7 @@ import {
   Gem,
   Palette,
   Sword,
+  Users,
 } from "lucide-react"
 
 export type Page =
@@ -18,6 +19,7 @@ export type Page =
   | 'profession-leveling'
   | 'prospecting'
   | 'theme-settings'
+  | 'user-management'
 
 const NAV_ITEMS: { id: Page; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
@@ -27,6 +29,7 @@ const NAV_ITEMS: { id: Page; label: string; icon: React.ComponentType<{ classNam
   { id: 'profession-leveling', label: 'Prof. Leveling', icon: TrendingUp },
   { id: 'prospecting', label: 'Prospecting', icon: Gem },
   { id: 'theme-settings', label: 'Theme Settings', icon: Palette },
+  { id: 'user-management', label: 'Kullanıcılar', icon: Users },
 ]
 
 interface SidebarProps {
