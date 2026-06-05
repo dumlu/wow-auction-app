@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
+import { useBuildDate } from '@/lib/useBuildDate'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -12,6 +13,7 @@ interface LoginPageProps {
 
 export function LoginPage({ isDark, onToggleDark }: LoginPageProps) {
   const login = useAuthStore(s => s.login)
+  const buildDate = useBuildDate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -84,7 +86,7 @@ export function LoginPage({ isDark, onToggleDark }: LoginPageProps) {
         </form>
 
         <p className="text-center text-xs text-muted-foreground">
-          Build: {new Date(__BUILD_DATE__).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' })}
+          {buildDate}
         </p>
       </div>
     </div>

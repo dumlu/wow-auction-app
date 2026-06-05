@@ -4,9 +4,11 @@ import { useAuctionStore } from "@/store/auctionStore"
 import { useRecipeStore } from "@/store/recipeStore"
 import { formatCopper } from "@/lib/money"
 import { BarChart3, Package, BookOpen, TrendingUp, AlertTriangle } from "lucide-react"
+import { useBuildDate } from "@/lib/useBuildDate"
 
 export function DashboardPage() {
   const { summaries, sessions, useDemoData, entries } = useAuctionStore()
+  const buildDate = useBuildDate()
   const { recipes } = useRecipeStore()
   const itemCount = summaries.size
   const totalAuctions = entries.length
@@ -28,9 +30,7 @@ export function DashboardPage() {
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground text-sm mt-1">Overview of your auction house data</p>
         </div>
-        <span className="text-xs text-muted-foreground">
-          Build: {new Date(__BUILD_DATE__).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' })}
-        </span>
+        <span className="text-xs text-muted-foreground">{buildDate}</span>
       </div>
 
       {useDemoData && (
