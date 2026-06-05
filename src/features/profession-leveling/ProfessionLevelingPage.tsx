@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useAuctionStore } from "@/store/auctionStore"
+import { useAuctionStore, getManualPricesMap } from "@/store/auctionStore"
 import { useRecipeStore } from "@/store/recipeStore"
 import { calculateLevelingPlan } from "@/services/levelingService"
 import { formatCopper, parseGoldSilverCopper } from "@/lib/money"
@@ -73,7 +73,8 @@ function MissingPricesPanel({ missingItems, onRecalculate }: {
   missingItems: string[]
   onRecalculate: () => void
 }) {
-  const { manualPrices, setManualPrice, summaries } = useAuctionStore()
+  const { entries, setManualPrice, summaries } = useAuctionStore()
+  const manualPrices = getManualPricesMap(entries)
 
   function handleSave(itemName: string, copper: number) {
     setManualPrice(itemName, copper)
@@ -81,7 +82,7 @@ function MissingPricesPanel({ missingItems, onRecalculate }: {
 
   const allFilled = missingItems.every(item => {
     const key = item.toLowerCase()
-    return manualPrices[key] !== undefined || summaries.has(key)
+    return manualPrices.has(key) || summaries.has(key)
   })
 
   return (
@@ -108,7 +109,7 @@ function MissingPricesPanel({ missingItems, onRecalculate }: {
           <MissingPriceRow
             key={item}
             itemName={item}
-            existingPrice={manualPrices[item.toLowerCase()]}
+            existingPrice={manualPrices.get(item.toLowerCase())}
             onSave={handleSave}
           />
         ))}
@@ -119,18 +120,14 @@ function MissingPricesPanel({ missingItems, onRecalculate }: {
 
 // ── Main page ──────────────────────────────────────────────────────────────
 export function ProfessionLevelingPage() {
-  const { summaries, priceSource, manualPrices } = useAuctionStore()
+  const { summaries, priceSource, entries } = useAuctionStore()
   const { recipes } = useRecipeStore()
   const [profession, setProfession] = useState<Profession>('Alchemy')
   const [fromSkill, setFromSkill] = useState(1)
   const [toSkill, setToSkill] = useState(300)
-  const [calcTick, setCalcTick] = useState(0)   // increment to force recalc
+  const [calcTick, setCalcTick] = useState(0)
 
-  // Build manualPrices Map from store (reacts to setManualPrice changes)
-  const manualPricesMap = useMemo(
-    () => new Map(Object.entries(manualPrices).map(([k, v]) => [k, v])),
-    [manualPrices]
-  )
+  const manualPricesMap = useMemo(() => getManualPricesMap(entries), [entries])
 
   const plan = useMemo(() => {
     if (calcTick === 0) return null
@@ -235,7 +232,7 @@ export function ProfessionLevelingPage() {
                         <div className="flex flex-wrap gap-1">
                           {step.reagentRequirements.map(r => {
                             const hasPrice = summaries.has(r.itemName.toLowerCase()) ||
-                              manualPrices[r.itemName.toLowerCase()] !== undefined
+                              manualPricesMap.has(r.itemName.toLowerCase())
                             return (
                               <Badge
                                 key={r.itemName}
@@ -276,7 +273,7 @@ export function ProfessionLevelingPage() {
                   }, {} as Record<string, number>)
                 ).sort(([a], [b]) => a.localeCompare(b)).map(([item, qty]) => {
                   const hasPrice = summaries.has(item.toLowerCase()) ||
-                    manualPrices[item.toLowerCase()] !== undefined
+                    manualPricesMap.has(item.toLowerCase())
                   return (
                     <div
                       key={item}

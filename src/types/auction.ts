@@ -18,7 +18,10 @@ export interface ItemPriceSummary {
   auctionCount: number
   lastScanDate: string
   entries: AuctionEntry[]
+  isManual: boolean   // true when all entries are manually entered
 }
+
+export const MANUAL_SELLER = '__manual__'
 
 export type PriceSource = 'min' | 'avg' | 'median' | 'manual'
 
