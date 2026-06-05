@@ -28,6 +28,7 @@ export interface Recipe {
   yellowSkill?: number
   greenSkill?: number
   greySkill?: number
+  guideCrafts?: number   // Wowhead recommended craft count for the full range
 }
 
 export interface RecipeCostResult {

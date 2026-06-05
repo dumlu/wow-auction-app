@@ -18,7 +18,17 @@ function getCraftsNeeded(recipe: Recipe, fromSkill: number, toSkill: number): nu
   const greyAt = recipe.greySkill ?? toSkill + 1
   const target = Math.min(toSkill, greyAt)
   if (fromSkill >= target) return 0
-  // Sum over each skill point the expected crafts needed
+
+  // If recipe has Wowhead guide crafts, scale proportionally to the requested range
+  if (recipe.guideCrafts && recipe.orangeSkill != null && recipe.greySkill != null) {
+    const fullRange = recipe.greySkill - recipe.orangeSkill
+    const requestedRange = target - fromSkill
+    if (fullRange > 0) {
+      return Math.max(1, Math.ceil(recipe.guideCrafts * (requestedRange / fullRange)))
+    }
+  }
+
+  // Fallback: probability model
   let total = 0
   for (let s = fromSkill; s < target; s++) {
     total += avgCraftsPerSkillPoint(recipe, s)
