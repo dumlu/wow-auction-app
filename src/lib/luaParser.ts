@@ -21,12 +21,14 @@ export function parseAuctionatorLua(content: string): ParsedLuaResult {
   if (realmMatch) result.realm = decodeUTF8String(realmMatch[1])
 
   const postingEntries = parsePostingHistory(content)
+  console.log(`Parsed Posting History: ${postingEntries.length} entries`)
   if (postingEntries.length > 0) {
     result.entries.push(...postingEntries)
     result.source = 'posting_history'
   }
 
   const priceEntries = parsePriceDatabase(content, result.parseErrors)
+  console.log(`Parsed Price Database: ${priceEntries.length} entries`)
   if (priceEntries.length > 0) {
     const existing = new Map(result.entries.map(e => [e.itemName.toLowerCase(), e]))
     for (const e of priceEntries) existing.set(e.itemName.toLowerCase(), e)
@@ -117,9 +119,15 @@ function parsePriceDatabase(content: string, errors: string[]): AuctionEntry[] {
 }
 
 function extractEntriesFromCborData(data: unknown): AuctionEntry[] {
-  if (!data || typeof data !== 'object') return []
+  if (!data || typeof data !== 'object') {
+    console.error('CBOR data is not an object:', typeof data)
+    return []
+  }
   const entries: AuctionEntry[] = []
   const obj = data as Record<string, unknown>
+  const keys = Object.keys(obj)
+  console.log(`Extracting from CBOR: ${keys.length} raw keys found`)
+  
   for (const [key, value] of Object.entries(obj)) {
     if (key === '__dbversion') continue
     if (!value || typeof value !== 'object') continue
@@ -138,6 +146,7 @@ function extractEntriesFromCborData(data: unknown): AuctionEntry[] {
       scanDate: new Date().toISOString(),
     })
   }
+  console.log(`Total Price Database entries extracted: ${entries.length}`)
   return entries
 }
 
