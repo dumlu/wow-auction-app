@@ -48,7 +48,7 @@ export function AuctionImportPage() {
       }
 
       const session: ImportSession = {
-        id: `session-${Date.now()}`,
+        id: crypto.randomUUID(),
         fileName: file.name,
         importDate: new Date().toISOString(),
         realm,

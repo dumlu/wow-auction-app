@@ -91,6 +91,21 @@ export const useAuthStore = create<AuthState>()((set) => ({
       options: { data: { display_name: displayName } },
     })
     if (error) return { ok: false, error: error.message }
+
+    // Profil trigger'ın yazması için kısa bekle, sonra listeyi yenile
+    await new Promise(r => setTimeout(r, 500))
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, email, display_name')
+      .order('created_at')
+    set({
+      users: (profiles ?? []).map((p: { id: string; email: string; display_name: string }) => ({
+        id: p.id,
+        email: p.email,
+        displayName: p.display_name,
+      })),
+    })
+
     return { ok: true }
   },
 
