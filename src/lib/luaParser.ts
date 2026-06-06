@@ -18,7 +18,7 @@ export function parseAuctionatorLua(content: string): ParsedLuaResult {
   }
 
   const realmMatch = content.match(/AUCTIONATOR_PRICE_DATABASE\s*=\s*\{[^}]*\["([^"_][^"]+)"\]/)
-  if (realmMatch) result.realm = realmMatch[1]
+  if (realmMatch) result.realm = decodeUTF8String(realmMatch[1])
 
   const postingEntries = parsePostingHistory(content)
   if (postingEntries.length > 0) {
@@ -48,15 +48,13 @@ function parsePostingHistory(content: string): AuctionEntry[] {
   if (!block) return []
 
   const entries: AuctionEntry[] = []
-  // Match item groups: ["itemId"] = { ... }
-  // Use a manual scan approach to find each item ID block
-  const idPattern = /\["(\d+)"\]\s*=\s*\{/g
+  // Match item groups: ["itemId"] = { ... } or ["gr:itemId:suffix"] = { ... }
+  const idPattern = /\["([^"]+)"\]\s*=\s*\{/g
   let m: RegExpExecArray | null
 
   while ((m = idPattern.exec(block)) !== null) {
     const itemId = m[1]
-    const itemName = WOW_ITEM_NAMES[itemId]
-    if (!itemName) continue
+    const itemName = resolveItemName(itemId) || `Unknown Item (${decodeUTF8String(itemId)})`
 
     // Find the end of this item's block
     const blockStart = m.index + m[0].length - 1
@@ -104,7 +102,7 @@ function parsePriceDatabase(content: string, errors: string[]): AuctionEntry[] {
   const entries: AuctionEntry[] = []
 
   while ((m = realmPattern.exec(block)) !== null) {
-    const realmName = m[1]
+    const realmName = decodeUTF8String(m[1])
     if (realmName === '__dbversion') continue
     const luaStr = m[2]
     try {
@@ -128,8 +126,7 @@ function extractEntriesFromCborData(data: unknown): AuctionEntry[] {
     const itemData = value as Record<string | number, unknown>
     const minPrice = typeof itemData['m'] === 'number' ? (itemData['m'] as number) : 0
     if (minPrice <= 0) continue
-    const itemName = resolveItemName(key)
-    if (!itemName) continue
+    const itemName = resolveItemName(key) || `Unknown Item (${decodeUTF8String(key)})`
     entries.push({
       id: `pdb-${key}`,
       itemName,
@@ -190,15 +187,7 @@ function decodeLuaString(luaStr: string): Uint8Array {
       }
       i++
     } else {
-      // Non-ASCII chars in the JS string represent binary data read as UTF-8
-      const code = luaStr.charCodeAt(i)
-      if (code < 128) {
-        bytes.push(code)
-      } else if (code < 2048) {
-        bytes.push((code >> 6) | 0xC0, (code & 0x3F) | 0x80)
-      } else {
-        bytes.push((code >> 12) | 0xE0, ((code >> 6) & 0x3F) | 0x80, (code & 0x3F) | 0x80)
-      }
+      bytes.push(luaStr.charCodeAt(i))
       i++
     }
   }
@@ -226,6 +215,14 @@ function extractLuaBlock(content: string, fromIdx: number): string | null {
     }
   }
   return null
+}
+
+function decodeUTF8String(str: string): string {
+  try {
+    return decodeURIComponent(escape(str))
+  } catch {
+    return str
+  }
 }
 
 export function parseAuctionCSV(content: string): AuctionEntry[] {

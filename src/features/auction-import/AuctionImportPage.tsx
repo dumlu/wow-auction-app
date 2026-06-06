@@ -6,7 +6,6 @@ import { Upload, FileText, CheckCircle, AlertCircle, Trash2 } from "lucide-react
 import { useAuctionStore } from "@/store/auctionStore"
 import { parseAuctionatorLua, parseAuctionCSV } from "@/lib/luaParser"
 import type { AuctionEntry, ImportSession } from "@/types/auction"
-import { formatCopper } from "@/lib/money"
 
 export function AuctionImportPage() {
   const { sessions, useDemoData, toggleDemoData, clearAll, addEntries, entries } = useAuctionStore()
@@ -18,11 +17,23 @@ export function AuctionImportPage() {
     setImporting(true)
     setLastResult(null)
     try {
-      const content = await file.text()
+      let content = ""
+      if (file.name.toLowerCase().endsWith('.lua')) {
+        // Read as ISO-8859-1 to preserve binary bytes (0-255) in LUA strings
+        content = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result as string)
+          reader.onerror = reject
+          reader.readAsText(file, 'ISO-8859-1')
+        })
+      } else {
+        content = await file.text()
+      }
+
       let importedEntries: AuctionEntry[] = []
       let realm: string | null = null
 
-      if (file.name.endsWith('.lua') || file.name.endsWith('.LUA')) {
+      if (file.name.toLowerCase().endsWith('.lua')) {
         const parsed = parseAuctionatorLua(content)
         realm = parsed.realm
         importedEntries = parsed.entries
