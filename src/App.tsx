@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Sidebar, type Page } from "@/components/layout/Sidebar"
 import { Header } from "@/components/layout/Header"
 import { DashboardPage } from "@/features/dashboard/DashboardPage"
@@ -11,31 +11,45 @@ import { ThemeSettingsPage } from "@/features/theme-settings/ThemeSettingsPage"
 import { LoginPage } from "@/features/auth/LoginPage"
 import { UserManagementPage } from "@/features/user-management/UserManagementPage"
 import { useAuthStore } from "@/store/authStore"
+import { useAuctionStore } from "@/store/auctionStore"
 import { storageGet, storageSet } from "@/lib/storage"
 
 export default function App() {
   const [page, setPage] = useState<Page>('dashboard')
   const [isDark, setIsDark] = useState(() => storageGet('dark-mode', false))
-  const user = useAuthStore(s => s.user)
+  const { user, loading: authLoading, initialize: initAuth } = useAuthStore()
+  const { initialize: initAuction } = useAuctionStore()
+  const initialized = useRef(false)
 
   useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
+    if (!initialized.current) {
+      initialized.current = true
+      initAuth()
     }
+  }, [initAuth])
+
+  useEffect(() => {
+    if (user) initAuction()
+  }, [user, initAuction])
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDark)
     storageSet('dark-mode', isDark)
   }, [isDark])
 
-  function toggleDark() {
-    setIsDark(d => !d)
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground text-sm">Yükleniyor…</p>
+      </div>
+    )
   }
 
   if (!user) {
-    return <LoginPage isDark={isDark} onToggleDark={toggleDark} />
+    return <LoginPage isDark={isDark} onToggleDark={() => setIsDark(d => !d)} />
   }
 
-  const pageContent = {
+  const pageContent: Record<Page, React.ReactNode> = {
     dashboard: <DashboardPage />,
     'auction-import': <AuctionImportPage />,
     'item-prices': <ItemPricesPage />,
@@ -50,7 +64,7 @@ export default function App() {
     <div className="flex min-h-screen bg-background">
       <Sidebar activePage={page} onNavigate={setPage} />
       <div className="flex-1 flex flex-col min-w-0">
-        <Header isDark={isDark} onToggleDark={toggleDark} />
+        <Header isDark={isDark} onToggleDark={() => setIsDark(d => !d)} />
         <main className="flex-1 p-6 overflow-auto">
           {pageContent[page]}
         </main>

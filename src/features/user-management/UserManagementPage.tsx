@@ -183,7 +183,7 @@ export function UserManagementPage() {
                   <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 justify-end">
-                      <ChangePasswordDialog email={u.email} />
+                      {u.email === currentUser?.email && <ChangePasswordDialog email={u.email} />}
                       <Button
                         variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"
                         onClick={() => handleRemove(u.email)}
