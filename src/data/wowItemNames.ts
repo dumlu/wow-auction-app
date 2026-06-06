@@ -9,6 +9,7 @@ export const WOW_ITEM_NAMES: Record<string, string> = {
   "23424": "Fel Iron Ore",
   "23425": "Adamantite Ore",
   "23426": "Eternium Ore",
+  "23427": "Adamantite Powder",
   "11370": "Dark Iron Ore",
   // Mining - Bars
   "2840": "Copper Bar",
