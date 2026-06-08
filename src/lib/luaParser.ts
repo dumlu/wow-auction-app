@@ -1,5 +1,4 @@
 import type { AuctionEntry } from '@/types/auction'
-import { decode as cborDecode } from 'cbor-x'
 import { WOW_ITEM_NAMES } from '@/data/wowItemNames'
 
 export interface ParsedLuaResult {
@@ -94,59 +93,189 @@ function parsePostingHistory(content: string): AuctionEntry[] {
 
 function parsePriceDatabase(content: string, errors: string[]): AuctionEntry[] {
   const dbStart = content.indexOf('AUCTIONATOR_PRICE_DATABASE = {')
-  if (dbStart === -1) return []
+  if (dbStart === -1) {
+    console.warn('AUCTIONATOR_PRICE_DATABASE not found')
+    return []
+  }
   const block = extractLuaBlock(content, dbStart + 'AUCTIONATOR_PRICE_DATABASE = '.length)
-  if (!block) return []
+  if (!block) {
+    console.warn('Failed to extract Price Database block')
+    return []
+  }
 
-  // Match realm entries: ["RealmName"] = "binary-cbor-data"
-  const realmPattern = /\["([^"_][^"]+)"\]\s*=\s*"((?:[^"\\]|\\.)*)"/g
-  let m: RegExpExecArray | null
   const entries: AuctionEntry[] = []
 
-  while ((m = realmPattern.exec(block)) !== null) {
-    const realmName = decodeUTF8String(m[1])
-    if (realmName === '__dbversion') continue
-    const luaStr = m[2]
+  // Parse realm entries manually to avoid regex stack overflow on multi-MB strings
+  let pos = 0
+  while (pos < block.length) {
+    // Find next ["RealmName"] = "
+    const keyStart = block.indexOf('["', pos)
+    if (keyStart === -1) break
+    const keyEnd = block.indexOf('"]', keyStart + 2)
+    if (keyEnd === -1) break
+    const rawRealm = block.slice(keyStart + 2, keyEnd)
+    pos = keyEnd + 2
+
+    // Skip whitespace and = sign
+    const eqIdx = block.indexOf('=', pos)
+    if (eqIdx === -1) break
+    pos = eqIdx + 1
+    while (pos < block.length && (block[pos] === ' ' || block[pos] === '\t')) pos++
+
+    // If value is not a quoted string, skip (e.g. __dbversion = 8)
+    if (block[pos] !== '"') {
+      pos = block.indexOf('\n', pos)
+      if (pos === -1) break
+      continue
+    }
+    if (rawRealm === '__dbversion') {
+      pos = block.indexOf('\n', pos)
+      if (pos === -1) break
+      continue
+    }
+
+    // Extract quoted Lua string manually (handles \" and \ddd escapes)
+    pos++ // skip opening "
+    const luaStrStart = pos
+    while (pos < block.length) {
+      if (block[pos] === '\\') { pos += 2; continue }
+      if (block[pos] === '"') break
+      pos++
+    }
+    const luaStr = block.slice(luaStrStart, pos)
+    pos++ // skip closing "
+
+    const realmName = decodeUTF8String(rawRealm)
+
     try {
       const bytes = decodeLuaString(luaStr)
-      const decoded = cborDecode(bytes) as unknown
-      entries.push(...extractEntriesFromCborData(decoded))
+      const realmEntries = parseCborPriceDatabase(bytes)
+      entries.push(...realmEntries)
     } catch (e) {
-      errors.push(`CBOR decode failed for realm "${realmName}": ${e instanceof Error ? e.message : String(e)}`)
+      const errMsg = `CBOR decode failed for realm "${realmName}": ${e instanceof Error ? e.message : String(e)}`
+      console.error(errMsg)
+      errors.push(errMsg)
     }
   }
   return entries
 }
 
-function extractEntriesFromCborData(data: unknown): AuctionEntry[] {
-  if (!data || typeof data !== 'object') {
-    console.error('CBOR data is not an object:', typeof data)
-    return []
+// Minimal CBOR parser for Auctionator's price database.
+// Uses a fully iterative skip (no recursion at all) to avoid any stack overflow.
+function parseCborPriceDatabase(data: Uint8Array): AuctionEntry[] {
+  let pos = 0
+  const dec = new TextDecoder('latin1')
+
+  function readCount(info: number): number {
+    if (info < 24) return info
+    if (info === 24) return data[pos++]
+    if (info === 25) { const v = (data[pos] << 8) | data[pos + 1]; pos += 2; return v }
+    if (info === 26) { const v = (data[pos] * 0x1000000) + ((data[pos + 1] << 16) | (data[pos + 2] << 8) | data[pos + 3]); pos += 4; return v }
+    return 0
   }
+
+  // Fully iterative skip — zero recursion.
+  // Takes already-decoded major+count so callers don't double-consume.
+  function skipBody(major: number, count: number): void {
+    const levels: number[] = [] // remaining children at each depth
+    let maj = major, cnt = count
+    while (true) {
+      let children = 0
+      switch (maj) {
+        case 2: case 3: pos += cnt; break
+        case 4: children = cnt; break
+        case 5: children = cnt * 2; break
+        case 6: children = 1; break
+      }
+      if (children > 0) {
+        levels.push(children - 1)
+        const nb = data[pos++]; maj = nb >> 5; cnt = readCount(nb & 0x1f)
+        continue
+      }
+      while (levels.length > 0) {
+        if (levels[levels.length - 1] > 0) {
+          levels[levels.length - 1]--
+          const nb = data[pos++]; maj = nb >> 5; cnt = readCount(nb & 0x1f)
+          break
+        }
+        levels.pop()
+      }
+      if (levels.length === 0) break
+    }
+  }
+
+  function skipFrom(b: number): void { skipBody(b >> 5, readCount(b & 0x1f)) }
+
+  function readStrFrom(b: number): string | null {
+    const major = b >> 5
+    const count = readCount(b & 0x1f)
+    if (major === 2 || major === 3) {
+      const s = dec.decode(data.subarray(pos, pos + count))
+      pos += count
+      return s
+    }
+    skipBody(major, count)
+    return null
+  }
+
+  function readUintFrom(b: number): number {
+    const major = b >> 5
+    const count = readCount(b & 0x1f)
+    if (major === 0) return count
+    skipBody(major, count)
+    return 0
+  }
+
   const entries: AuctionEntry[] = []
-  const obj = data as Record<string, unknown>
-  const keys = Object.keys(obj)
-  console.log(`Extracting from CBOR: ${keys.length} raw keys found`)
-  
-  for (const [key, value] of Object.entries(obj)) {
-    if (key === '__dbversion') continue
-    if (!value || typeof value !== 'object') continue
-    const itemData = value as Record<string | number, unknown>
-    const minPrice = typeof itemData['m'] === 'number' ? (itemData['m'] as number) : 0
-    if (minPrice <= 0) continue
-    const itemName = resolveItemName(key) || `Unknown Item (${decodeUTF8String(key)})`
-    entries.push({
-      id: `pdb-${key}`,
-      itemName,
-      quantity: 1,
-      buyoutPrice: minPrice,
-      unitPrice: minPrice,
-      seller: '',
-      timeLeft: '',
-      scanDate: new Date().toISOString(),
-    })
+
+  const topB = data[pos++]
+  if ((topB >> 5) !== 5) return entries
+  const topCount = readCount(topB & 0x1f)
+
+  for (let i = 0; i < topCount; i++) {
+    const itemKey = readStrFrom(data[pos++])
+    if (itemKey === null) { skipFrom(data[pos++]); continue }
+    if (itemKey === '__dbversion') { skipFrom(data[pos++]); continue }
+
+    const vb = data[pos++]
+    if ((vb >> 5) !== 5) { skipFrom(vb); continue }
+
+    const fieldCount = readCount(vb & 0x1f)
+    let minPrice = 0
+
+    for (let j = 0; j < fieldCount; j++) {
+      const fieldKey = readStrFrom(data[pos++])
+      if (fieldKey === null) { skipFrom(data[pos++]); continue }
+
+      if (fieldKey === 'm') {
+        minPrice = readUintFrom(data[pos++])
+        // skip remaining fields
+        for (let k = j + 1; k < fieldCount; k++) {
+          skipFrom(data[pos++]) // key
+          skipFrom(data[pos++]) // value
+        }
+        break
+      } else {
+        skipFrom(data[pos++]) // skip value
+      }
+    }
+
+    if (minPrice > 0) {
+      const itemName = resolveItemName(itemKey) || `Unknown Item (${decodeUTF8String(itemKey)})`
+      if (itemKey === '24036') console.log(`Nightseye raw minPrice: ${minPrice} copper = ${(minPrice/10000).toFixed(2)}g`)
+      entries.push({
+        id: `pdb-${itemKey}`,
+        itemName,
+        quantity: 1,
+        buyoutPrice: minPrice,
+        unitPrice: minPrice,
+        seller: '',
+        timeLeft: '',
+        scanDate: new Date().toISOString(),
+      })
+    }
   }
-  console.log(`Total Price Database entries extracted: ${entries.length}`)
+
   return entries
 }
 

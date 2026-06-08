@@ -19,12 +19,20 @@ export function AuctionImportPage() {
     try {
       let content = ""
       if (file.name.toLowerCase().endsWith('.lua')) {
-        // Read as ISO-8859-1 to preserve binary bytes (0-255) in LUA strings
+        // Read as ArrayBuffer then decode byte-by-byte to avoid Windows-1252 corruption.
+        // Browsers map 'ISO-8859-1' to windows-1252 per the Encoding Standard, which remaps
+        // bytes 0x80-0x9F to multi-byte Unicode chars. That corrupts the CBOR binary data
+        // stored in AUCTIONATOR_PRICE_DATABASE. String.fromCharCode preserves each byte as-is.
         content = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader()
-          reader.onload = () => resolve(reader.result as string)
+          reader.onload = () => {
+            const bytes = new Uint8Array(reader.result as ArrayBuffer)
+            const chars: string[] = new Array(bytes.length)
+            for (let i = 0; i < bytes.length; i++) chars[i] = String.fromCharCode(bytes[i])
+            resolve(chars.join(''))
+          }
           reader.onerror = reject
-          reader.readAsText(file, 'ISO-8859-1')
+          reader.readAsArrayBuffer(file)
         })
       } else {
         content = await file.text()
@@ -95,7 +103,12 @@ export function AuctionImportPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Import File</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Import File
+            <Badge variant="outline" className="text-xs font-normal text-green-600 border-green-400">
+              AH fiyat veritabanı aktif
+            </Badge>
+          </CardTitle>
           <CardDescription>
             Supported: Auctionator.lua (saved variables) or TSV/CSV with columns: item, unit price, quantity, seller
           </CardDescription>
