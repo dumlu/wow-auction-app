@@ -261,8 +261,8 @@ function parseCborPriceDatabase(data: Uint8Array): AuctionEntry[] {
     }
 
     if (minPrice > 0) {
-      const itemName = resolveItemName(itemKey) || `Unknown Item (${decodeUTF8String(itemKey)})`
-      if (itemKey === '24036') console.log(`Nightseye raw minPrice: ${minPrice} copper = ${(minPrice/10000).toFixed(2)}g`)
+      const itemName = resolveItemName(itemKey)
+      if (!itemName) continue
       entries.push({
         id: `pdb-${itemKey}`,
         itemName,
