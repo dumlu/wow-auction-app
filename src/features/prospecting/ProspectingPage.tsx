@@ -9,7 +9,56 @@ import { useAuctionStore } from "@/store/auctionStore"
 import { calculateProspecting } from "@/services/prospectingService"
 import { formatCopper, parseGoldSilverCopper } from "@/lib/money"
 import { SEED_DROP_TABLES } from "@/data/seedDropTables"
-import { AlertTriangle } from "lucide-react"
+import { AlertTriangle, Pencil, Check, X } from "lucide-react"
+
+// ── Inline price editor for drops ──────────────────────────────────────────
+function DropPriceEditor({ itemName, currentPrice }: { itemName: string; currentPrice?: number }) {
+  const { setManualPrice } = useAuctionStore()
+  const [editing, setEditing] = useState(false)
+  const [raw, setRaw] = useState('')
+
+  function startEdit() {
+    setRaw(currentPrice ? formatCopper(currentPrice) : '')
+    setEditing(true)
+  }
+
+  function commit() {
+    const copper = parseGoldSilverCopper(raw)
+    if (copper > 0) setManualPrice(itemName, copper)
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1 justify-end">
+        <Input
+          className="w-24 h-6 text-[10px] font-mono px-1"
+          value={raw}
+          autoFocus
+          placeholder="e.g. 5g"
+          onChange={e => setRaw(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false) }}
+        />
+        <button onClick={commit} className="text-green-600 hover:opacity-70"><Check className="h-3 w-3" /></button>
+        <button onClick={() => setEditing(false)} className="text-muted-foreground hover:opacity-70"><X className="h-3 w-3" /></button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-1 justify-end group">
+      <span className={currentPrice ? "font-mono" : "text-destructive"}>
+        {currentPrice ? formatCopper(currentPrice) : 'Missing'}
+      </span>
+      <button
+        onClick={startEdit}
+        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity"
+      >
+        <Pencil className="h-3 w-3" />
+      </button>
+    </div>
+  )
+}
 
 export function ProspectingPage() {
   const { summaries, priceSource } = useAuctionStore()
@@ -142,8 +191,11 @@ export function ProspectingPage() {
                     <tr key={drop.itemName} className="border-b">
                       <td className="py-2 font-medium">{drop.itemName}</td>
                       <td className="py-2 text-right">{drop.expectedQty.toFixed(2)}</td>
-                      <td className="py-2 text-right font-mono text-xs">
-                        {drop.missingPrice ? <Badge variant="destructive" className="text-xs">Missing</Badge> : formatCopper(drop.unitPrice)}
+                      <td className="py-2 text-right">
+                        <DropPriceEditor
+                          itemName={drop.itemName}
+                          currentPrice={drop.missingPrice ? undefined : drop.unitPrice}
+                        />
                       </td>
                       <td className="py-2 text-right font-mono text-xs font-bold">
                         {drop.missingPrice ? '-' : formatCopper(drop.totalValue)}

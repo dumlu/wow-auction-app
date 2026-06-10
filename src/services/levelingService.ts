@@ -51,58 +51,88 @@ export function calculateLevelingPlan(
   let totalRevenue = 0
   const allMissingPrices = new Set<string>()
 
-  const profRecipes = recipes.filter(r => r.profession === profession)
+  const profRecipes = recipes.filter(r => r.profession === profession).sort((a,b) => a.requiredSkill - b.requiredSkill)
 
-  while (currentSkill < toSkill) {
-    const available = profRecipes.filter(r => {
-      const canLearn = r.requiredSkill <= currentSkill
-      const notGrey = !r.greySkill || r.greySkill > currentSkill
-      // orangeSkill is when the recipe first becomes available (turns orange)
-      const isAvailable = !r.orangeSkill || r.orangeSkill <= currentSkill
-      return canLearn && notGrey && isAvailable
-    })
+  // Safety: Prevent infinite loops
+  let iterations = 0
+  const MAX_ITERATIONS = 500
+  
+  while (currentSkill < toSkill && iterations < MAX_ITERATIONS) {
+    iterations++
+    const lastSkill = currentSkill
 
-    if (available.length === 0) break
+    // Look for a recipe that specifically starts at or before our current skill
+    // AND has a target skill (yellowSkill) greater than our current skill.
+    const stepRecipe = profRecipes.find(r => 
+      r.requiredSkill <= currentSkill && 
+      (r.yellowSkill || 0) > currentSkill
+    )
 
-    // Cost each available recipe; pick lowest net cost with no missing prices first
-    const costed = available.map(r => calculateRecipeCost(r, summaries, priceSource, manualPrices))
-    const withPrices = costed.filter(c => c.missingPrices.length === 0)
-    const chosen = withPrices.length > 0
-      ? withPrices.reduce((a, b) => a.netCost < b.netCost ? a : b)
-      : costed.reduce((a, b) => a.missingPrices.length < b.missingPrices.length ? a : b)
+    if (!stepRecipe) {
+      // Fallback: Pick the first recipe we can learn that isn't grey
+      const available = profRecipes.filter(r => 
+        r.requiredSkill <= currentSkill && 
+        (!r.greySkill || r.greySkill > currentSkill)
+      )
+      if (available.length === 0) break
+      
+      const costed = available.map(r => calculateRecipeCost(r, summaries, priceSource, manualPrices))
+      const chosen = costed.reduce((a, b) => a.netCost < b.netCost ? a : b)
+      
+      const recipe = chosen.recipe
+      const target = Math.min(toSkill, recipe.greySkill || toSkill + 1, (recipe.requiredSkill + 10))
+      
+      // Ensure target is always greater than currentSkill
+      const safeTarget = target > currentSkill ? target : currentSkill + 1
+      const crafts = getCraftsNeeded(recipe, currentSkill, safeTarget)
+      
+      addStep(chosen, crafts, safeTarget)
+      if (currentSkill <= lastSkill) currentSkill = safeTarget // Force progress
+      continue
+    }
 
+    // We found a specific guide step
+    const chosen = calculateRecipeCost(stepRecipe, summaries, priceSource, manualPrices)
+    const target = Math.min(toSkill, stepRecipe.yellowSkill!)
+    
+    // Ensure target is always greater than currentSkill
+    const safeTarget = target > currentSkill ? target : currentSkill + 1
+    
+    // FORCE use of guideCrafts if it exists and is > 0
+    const crafts = (stepRecipe.guideCrafts && stepRecipe.guideCrafts > 0) 
+      ? stepRecipe.guideCrafts 
+      : getCraftsNeeded(stepRecipe, currentSkill, safeTarget)
+    
+    addStep(chosen, crafts, safeTarget)
+    if (currentSkill <= lastSkill) currentSkill = safeTarget // Force progress
+  }
+
+  function addStep(chosen: any, crafts: number, target: number) {
     const recipe = chosen.recipe
-    const greyAt = recipe.greySkill ?? toSkill + 1
-    const targetForThisStep = Math.min(toSkill, greyAt)
-    const craftsNeeded = Math.max(1, getCraftsNeeded(recipe, currentSkill, targetForThisStep))
-
-    const stepCost = multiplyCopper(chosen.costPerCraft, craftsNeeded)
-    const stepRevenue = multiplyCopper(chosen.outputValue, craftsNeeded)
-    const stepNetCost = stepCost - stepRevenue
-
+    const stepCost = multiplyCopper(chosen.costPerCraft, crafts)
+    const stepRevenue = multiplyCopper(chosen.outputValue, crafts)
+    
     for (const p of chosen.missingPrices) allMissingPrices.add(p)
-
-    const reagentRequirements = recipe.reagents.map(r => ({
-      itemName: r.itemName,
-      totalQuantity: r.quantity * craftsNeeded,
-    }))
 
     steps.push({
       fromSkill: currentSkill,
-      toSkill: targetForThisStep,
+      toSkill: target,
       recipe,
-      craftsNeeded,
-      reagentRequirements,
+      craftsNeeded: crafts,
+      reagentRequirements: recipe.reagents.map((r: any) => ({
+        itemName: r.itemName,
+        totalQuantity: r.quantity * crafts,
+      })),
       totalCost: stepCost,
       totalRevenue: stepRevenue,
-      netCost: stepNetCost,
+      netCost: stepCost - stepRevenue,
       missingPrices: chosen.missingPrices,
       costResult: chosen,
     })
 
     totalCost = addCopper(totalCost, stepCost)
     totalRevenue = addCopper(totalRevenue, stepRevenue)
-    currentSkill = targetForThisStep
+    currentSkill = target
   }
 
   return {

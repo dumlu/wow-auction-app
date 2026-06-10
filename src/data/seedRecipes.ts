@@ -280,8 +280,8 @@ export const SEED_RECIPES: Recipe[] = [
     outputItem: 'Tigerseye Band',
     outputQuantity: 1,
     reagents: [
-      { itemName: 'Tigerseye', quantity: 2 },
-      { itemName: 'Delicate Copper Wire', quantity: 2 },
+      { itemName: 'Tigerseye', quantity: 1 },
+      { itemName: 'Delicate Copper Wire', quantity: 1 },
     ],
     orangeSkill: 30, yellowSkill: 45, greenSkill: 55, greySkill: 75,
     guideCrafts: 20,
@@ -545,6 +545,17 @@ export const SEED_RECIPES: Recipe[] = [
     ],
     orangeSkill: 350, yellowSkill: 360, greenSkill: 368, greySkill: 380,
     guideCrafts: 15,
+  },
+  {
+    id: 'jc-powerful-earthstorm-diamond',
+    profession: 'Jewelcrafting' as const,
+    recipeName: 'Powerful Earthstorm Diamond',
+    requiredSkill: 365,
+    outputItem: 'Powerful Earthstorm Diamond',
+    outputQuantity: 1,
+    reagents: [{ itemName: 'Earthstorm Diamond', quantity: 1 }],
+    orangeSkill: 365, yellowSkill: 375, greenSkill: 375, greySkill: 385,
+    guideCrafts: 10,
   },
     // ============================================================
   // BLACKSMITHING (1-375)

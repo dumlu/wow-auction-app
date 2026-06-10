@@ -11,6 +11,22 @@ import { Search, ArrowUpDown, Pencil, Check, X, Plus, Trash2 } from "lucide-reac
 
 type SortKey = 'name' | 'minPrice' | 'avgPrice' | 'medianPrice' | 'totalQuantity'
 
+function SortBtn({ k, label, activeKey, dir, onToggle }: { 
+  k: SortKey; 
+  label: string; 
+  activeKey: SortKey; 
+  dir: 'asc' | 'desc'; 
+  onToggle: (k: SortKey) => void 
+}) {
+  return (
+    <button className="flex items-center gap-1 hover:text-foreground" onClick={() => onToggle(k)}>
+      {label}
+      <ArrowUpDown className="h-3 w-3" />
+      {activeKey === k && <span className="text-xs">{dir === 'asc' ? '↑' : '↓'}</span>}
+    </button>
+  )
+}
+
 // ── Inline price editor cell ───────────────────────────────────────────────
 function EditablePrice({ item }: { item: ItemPriceSummary }) {
   const { setManualPrice, removeManualPrice } = useAuctionStore()
@@ -125,9 +141,11 @@ export function ItemPricesPage() {
     let list = [...summaries.values()]
     if (search) list = list.filter(i => i.itemName.toLowerCase().includes(search.toLowerCase()))
     list.sort((a, b) => {
-      let cmp = 0
-      if (sortKey === 'name') cmp = a.itemName.localeCompare(b.itemName)
-      else cmp = (a[sortKey] as number) - (b[sortKey] as number)
+      if (sortKey === 'name') {
+        const cmp = a.itemName.localeCompare(b.itemName)
+        return sortDir === 'asc' ? cmp : -cmp
+      }
+      const cmp = (a[sortKey] as number) - (b[sortKey] as number)
       return sortDir === 'asc' ? cmp : -cmp
     })
     return list
@@ -137,14 +155,6 @@ export function ItemPricesPage() {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortKey(key); setSortDir('asc') }
   }
-
-  const SortBtn = ({ k, label }: { k: SortKey; label: string }) => (
-    <button className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort(k)}>
-      {label}
-      <ArrowUpDown className="h-3 w-3" />
-      {sortKey === k && <span className="text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>}
-    </button>
-  )
 
   return (
     <div className="space-y-6">
@@ -184,11 +194,21 @@ export function ItemPricesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-muted-foreground">
-                  <th className="text-left px-4 py-3 font-medium"><SortBtn k="name" label="Item" /></th>
-                  <th className="text-right px-4 py-3 font-medium"><SortBtn k="minPrice" label="Min" /></th>
-                  <th className="text-right px-4 py-3 font-medium"><SortBtn k="avgPrice" label="Avg" /></th>
-                  <th className="text-right px-4 py-3 font-medium"><SortBtn k="medianPrice" label="Median" /></th>
-                  <th className="text-right px-4 py-3 font-medium"><SortBtn k="totalQuantity" label="Qty" /></th>
+                  <th className="text-left px-4 py-3 font-medium">
+                    <SortBtn k="name" label="Item" activeKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+                  </th>
+                  <th className="text-right px-4 py-3 font-medium">
+                    <SortBtn k="minPrice" label="Min" activeKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+                  </th>
+                  <th className="text-right px-4 py-3 font-medium">
+                    <SortBtn k="avgPrice" label="Avg" activeKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+                  </th>
+                  <th className="text-right px-4 py-3 font-medium">
+                    <SortBtn k="medianPrice" label="Median" activeKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+                  </th>
+                  <th className="text-right px-4 py-3 font-medium">
+                    <SortBtn k="totalQuantity" label="Qty" activeKey={sortKey} dir={sortDir} onToggle={toggleSort} />
+                  </th>
                   <th className="text-right px-4 py-3 font-medium">Auctions</th>
                   <th className="text-right px-4 py-3 font-medium">Last Scan</th>
                 </tr>

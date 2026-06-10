@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -6,11 +6,11 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuctionStore, getManualPricesMap } from "@/store/auctionStore"
-import { useRecipeStore } from "@/store/recipeStore"
+import { useLevelingStore } from "@/store/levelingStore"
 import { calculateLevelingPlan } from "@/services/levelingService"
 import { formatCopper, parseGoldSilverCopper } from "@/lib/money"
-import type { Profession } from "@/types/recipe"
-import { AlertTriangle, ChevronRight, Package, Check, Pencil } from "lucide-react"
+import type { Profession, Recipe } from "@/types/recipe"
+import { AlertTriangle, ChevronRight, Package, Check, Pencil, RotateCcw, Plus, Trash2 } from "lucide-react"
 
 const PROFESSIONS: Profession[] = ['Alchemy','Blacksmithing','Enchanting','Engineering','Jewelcrafting','Leatherworking','Mining','Tailoring']
 
@@ -121,26 +121,43 @@ function MissingPricesPanel({ missingItems, onRecalculate }: {
 // ── Main page ──────────────────────────────────────────────────────────────
 export function ProfessionLevelingPage() {
   const { summaries, priceSource, entries } = useAuctionStore()
-  const { recipes } = useRecipeStore()
+  const { recipes: levelingRecipes, initialize, resetToDefaults, loading: levelingLoading, deleteRecipe, updateRecipe, addRecipe } = useLevelingStore()
+  
   const [profession, setProfession] = useState<Profession>('Alchemy')
   const [fromSkill, setFromSkill] = useState(1)
   const [toSkill, setToSkill] = useState(300)
   const [calcTick, setCalcTick] = useState(0)
+  const [isEditing, setIsEditing] = useState(false)
+
+  useEffect(() => {
+    initialize()
+  }, [])
 
   const manualPricesMap = useMemo(() => getManualPricesMap(entries), [entries])
 
   const plan = useMemo(() => {
-    if (calcTick === 0) return null
-    return calculateLevelingPlan(profession, fromSkill, toSkill, recipes, summaries, priceSource, manualPricesMap)
-  }, [calcTick, profession, fromSkill, toSkill, recipes, summaries, priceSource, manualPricesMap])
+    return calculateLevelingPlan(profession, fromSkill, toSkill, levelingRecipes, summaries, priceSource, manualPricesMap)
+  }, [calcTick, profession, fromSkill, toSkill, levelingRecipes, summaries, priceSource, manualPricesMap])
 
   function calculate() { setCalcTick(t => t + 1) }
 
+  const profRecipes = levelingRecipes.filter(r => r.profession === profession)
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Profession Leveling</h1>
-        <p className="text-muted-foreground text-sm mt-1">Calculate the most cost-efficient path to level a profession</p>
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Profession Leveling</h1>
+          <p className="text-muted-foreground text-sm mt-1">Calculate the most cost-efficient path to level a profession</p>
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setIsEditing(!isEditing)}>
+            {isEditing ? 'View Mode' : 'Edit Guide'}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={resetToDefaults} disabled={levelingLoading}>
+            <RotateCcw className="h-3 w-3 mr-1" /> Reset Defaults
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -162,12 +179,12 @@ export function ProfessionLevelingPage() {
               <Label>To Skill</Label>
               <Input type="number" min={1} max={375} value={toSkill} onChange={e => { setToSkill(+e.target.value); setCalcTick(0) }} />
             </div>
-            <Button onClick={calculate}>Calculate</Button>
+            <Button onClick={calculate}>Recalculate</Button>
           </div>
         </CardContent>
       </Card>
 
-      {plan && (
+      {plan && !isEditing && (
         <>
           {/* Missing prices — editable inline */}
           {plan.allMissingPrices.length > 0 && (
@@ -207,7 +224,7 @@ export function ProfessionLevelingPage() {
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
                 No recipes found for {profession} between skill {fromSkill} and {toSkill}.<br />
-                Add recipes in the Recipes tab.
+                Switch to Edit Mode to manage the guide.
               </CardContent>
             </Card>
           ) : (
@@ -290,6 +307,102 @@ export function ProfessionLevelingPage() {
             </CardContent>
           </Card>
         </>
+      )}
+
+      {isEditing && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base">{profession} Leveling Guide Editor</CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">Manage the leveling path and required crafts for each step.</p>
+              </div>
+              <Button size="sm" onClick={() => addRecipe({ 
+                profession, 
+                recipeName: 'New Step', 
+                requiredSkill: 1, 
+                outputItem: '', 
+                outputQuantity: 1, 
+                reagents: [],
+                guideCrafts: 10,
+                yellowSkill: 50 // Default end of range for new step
+              })}>
+                <Plus className="h-3 w-3 mr-1" /> Add Step
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-auto max-h-[600px]">
+              <table className="w-full text-sm">
+                <thead className="bg-muted text-muted-foreground sticky top-0 z-10">
+                  <tr>
+                    <th className="text-left px-4 py-2 font-medium w-32">Skill Range</th>
+                    <th className="text-left px-4 py-2 font-medium">Recipe Name</th>
+                    <th className="text-left px-4 py-2 font-medium">Output Item</th>
+                    <th className="text-center px-4 py-2 font-medium w-20">Crafts</th>
+                    <th className="text-right px-4 py-2 font-medium w-10"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {profRecipes.map(r => (
+                    <tr key={r.id} className="border-b hover:bg-muted/30 group">
+                      <td className="px-4 py-2">
+                        <div className="flex items-center gap-1">
+                          <Input 
+                            type="number" 
+                            className="h-7 text-xs px-1 w-12" 
+                            value={r.requiredSkill} 
+                            onChange={e => updateRecipe({ ...r, requiredSkill: +e.target.value })} 
+                          />
+                          <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                          <Input 
+                            type="number" 
+                            className="h-7 text-xs px-1 w-12" 
+                            value={r.yellowSkill || r.requiredSkill + 10} 
+                            onChange={e => updateRecipe({ ...r, yellowSkill: +e.target.value })} 
+                          />
+                        </div>
+                      </td>
+                      <td className="px-4 py-2">
+                        <Input 
+                          className="h-7 text-xs" 
+                          value={r.recipeName} 
+                          onChange={e => updateRecipe({ ...r, recipeName: e.target.value })} 
+                        />
+                      </td>
+                      <td className="px-4 py-2">
+                        <Input 
+                          className="h-7 text-xs" 
+                          value={r.outputItem} 
+                          onChange={e => updateRecipe({ ...r, outputItem: e.target.value })} 
+                        />
+                      </td>
+                      <td className="px-4 py-2 w-24">
+                        <Input 
+                          type="number" 
+                          className="h-7 text-xs text-center font-mono" 
+                          value={r.guideCrafts || 0} 
+                          min={1}
+                          max={999}
+                          onChange={e => updateRecipe({ ...r, guideCrafts: +e.target.value })} 
+                        />
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive opacity-0 group-hover:opacity-100" onClick={() => deleteRecipe(r.id!)}>
+                           <Trash2 className="h-3 w-3" />
+                         </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="p-4 bg-muted/20 text-[10px] text-muted-foreground flex justify-between items-center">
+              <span>* Reagents are shared with the main Recipe list. Editing details here updates your personal guide.</span>
+              <Badge variant="outline" className="font-normal">{profRecipes.length} steps in guide</Badge>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   )

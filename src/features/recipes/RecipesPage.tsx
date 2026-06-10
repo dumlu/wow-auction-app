@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -10,7 +10,7 @@ import { useRecipeStore } from "@/store/recipeStore"
 import { useAuctionStore } from "@/store/auctionStore"
 import { calculateRecipeCost } from "@/services/recipeService"
 import { formatCopper } from "@/lib/money"
-import type { Recipe, Profession, Reagent } from "@/types/recipe"
+import type { Recipe, Profession } from "@/types/recipe"
 import { Plus, Download, Upload, Trash2, Search } from "lucide-react"
 
 const PROFESSIONS: Profession[] = ['Alchemy','Blacksmithing','Enchanting','Engineering','Jewelcrafting','Leatherworking','Mining','Tailoring']

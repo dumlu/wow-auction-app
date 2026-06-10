@@ -57,55 +57,49 @@ export const SEED_DROP_TABLES: DropTable[] = [
   },
 
   // ── TBC ──────────────────────────────────────────────────────
-  // Fel Iron Ore — drops common TBC gems + Adamantite Powder
+  // Data based on TBC Classic community benchmarks (Wowhead/Wow-Professions)
   {
     id: 'prospect-fel-iron',
     inputItem: 'Fel Iron Ore',
     inputQuantityPerRoll: 5,
     possibleDrops: [
-      { itemName: 'Blood Garnet',      chance: 0.22, minQty: 1, maxQty: 2 },
-      { itemName: 'Deep Peridot',      chance: 0.22, minQty: 1, maxQty: 2 },
-      { itemName: 'Shadow Draenite',   chance: 0.22, minQty: 1, maxQty: 2 },
-      { itemName: 'Golden Draenite',   chance: 0.22, minQty: 1, maxQty: 2 },
-      { itemName: 'Azure Moonstone',   chance: 0.22, minQty: 1, maxQty: 2 },
-      { itemName: 'Flame Spessarite',  chance: 0.22, minQty: 1, maxQty: 2 },
-      { itemName: 'Adamantite Powder', chance: 0.35, minQty: 1, maxQty: 2 },
+      // Common Gems (~18% each)
+      { itemName: 'Blood Garnet',      chance: 0.18, minQty: 1, maxQty: 2 },
+      { itemName: 'Deep Peridot',      chance: 0.18, minQty: 1, maxQty: 2 },
+      { itemName: 'Shadow Draenite',   chance: 0.18, minQty: 1, maxQty: 2 },
+      { itemName: 'Golden Draenite',   chance: 0.18, minQty: 1, maxQty: 2 },
+      { itemName: 'Azure Moonstone',   chance: 0.18, minQty: 1, maxQty: 2 },
+      { itemName: 'Flame Spessarite',  chance: 0.18, minQty: 1, maxQty: 2 },
+      // Rare Gems (~1.3% each, ~7.8% total)
+      { itemName: 'Living Ruby',       chance: 0.013, minQty: 1, maxQty: 1 },
+      { itemName: 'Noble Topaz',       chance: 0.013, minQty: 1, maxQty: 1 },
+      { itemName: 'Dawnstone',         chance: 0.013, minQty: 1, maxQty: 1 },
+      { itemName: 'Nightseye',         chance: 0.013, minQty: 1, maxQty: 1 },
+      { itemName: 'Star of Elune',     chance: 0.013, minQty: 1, maxQty: 1 },
+      { itemName: 'Talasite',          chance: 0.013, minQty: 1, maxQty: 1 },
     ],
   },
-  // Adamantite Ore — drops uncommon TBC gems + Adamantite Powder
   {
     id: 'prospect-adamantite',
     inputItem: 'Adamantite Ore',
     inputQuantityPerRoll: 5,
     possibleDrops: [
-      { itemName: 'Talasite',          chance: 0.12, minQty: 1, maxQty: 1 },
-      { itemName: 'Nightseye',         chance: 0.12, minQty: 1, maxQty: 1 },
-      { itemName: 'Dawnstone',         chance: 0.12, minQty: 1, maxQty: 1 },
-      { itemName: 'Living Ruby',       chance: 0.12, minQty: 1, maxQty: 1 },
-      { itemName: 'Noble Topaz',       chance: 0.12, minQty: 1, maxQty: 1 },
-      { itemName: 'Star of Elune',     chance: 0.12, minQty: 1, maxQty: 1 },
-      { itemName: 'Blood Garnet',      chance: 0.10, minQty: 1, maxQty: 2 },
-      { itemName: 'Deep Peridot',      chance: 0.10, minQty: 1, maxQty: 2 },
-      { itemName: 'Shadow Draenite',   chance: 0.10, minQty: 1, maxQty: 2 },
-      { itemName: 'Golden Draenite',   chance: 0.10, minQty: 1, maxQty: 2 },
-      { itemName: 'Azure Moonstone',   chance: 0.10, minQty: 1, maxQty: 2 },
-      { itemName: 'Flame Spessarite',  chance: 0.10, minQty: 1, maxQty: 2 },
-      { itemName: 'Adamantite Powder', chance: 0.50, minQty: 1, maxQty: 3 },
-    ],
-  },
-  // Rich Adamantite Ore — same as Adamantite but better rates
-  {
-    id: 'prospect-rich-adamantite',
-    inputItem: 'Adamantite Ore',  // same ore, just higher-yield node
-    inputQuantityPerRoll: 5,
-    possibleDrops: [
-      { itemName: 'Talasite',          chance: 0.18, minQty: 1, maxQty: 2 },
-      { itemName: 'Nightseye',         chance: 0.18, minQty: 1, maxQty: 2 },
-      { itemName: 'Dawnstone',         chance: 0.18, minQty: 1, maxQty: 2 },
-      { itemName: 'Living Ruby',       chance: 0.18, minQty: 1, maxQty: 2 },
-      { itemName: 'Noble Topaz',       chance: 0.18, minQty: 1, maxQty: 2 },
-      { itemName: 'Star of Elune',     chance: 0.18, minQty: 1, maxQty: 2 },
-      { itemName: 'Adamantite Powder', chance: 0.60, minQty: 2, maxQty: 4 },
+      // Uncommon Gems (~18% each, usually 1-2 per prospect)
+      { itemName: 'Blood Garnet',      chance: 0.18, minQty: 1, maxQty: 2 },
+      { itemName: 'Deep Peridot',      chance: 0.18, minQty: 1, maxQty: 2 },
+      { itemName: 'Shadow Draenite',   chance: 0.18, minQty: 1, maxQty: 2 },
+      { itemName: 'Golden Draenite',   chance: 0.18, minQty: 1, maxQty: 2 },
+      { itemName: 'Azure Moonstone',   chance: 0.18, minQty: 1, maxQty: 2 },
+      { itemName: 'Flame Spessarite',  chance: 0.18, minQty: 1, maxQty: 2 },
+      // Rare Gems (~4% each, ~24% total)
+      { itemName: 'Living Ruby',       chance: 0.04, minQty: 1, maxQty: 1 },
+      { itemName: 'Noble Topaz',       chance: 0.04, minQty: 1, maxQty: 1 },
+      { itemName: 'Dawnstone',         chance: 0.04, minQty: 1, maxQty: 1 },
+      { itemName: 'Nightseye',         chance: 0.04, minQty: 1, maxQty: 1 },
+      { itemName: 'Star of Elune',     chance: 0.04, minQty: 1, maxQty: 1 },
+      { itemName: 'Talasite',          chance: 0.04, minQty: 1, maxQty: 1 },
+      // Guaranteed/High chance powder
+      { itemName: 'Adamantite Powder', chance: 1.00, minQty: 1, maxQty: 1 },
     ],
   },
 ]

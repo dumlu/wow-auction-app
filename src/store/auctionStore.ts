@@ -6,6 +6,7 @@ import { MANUAL_SELLER } from '@/types/auction'
 import { buildItemSummaries } from '@/services/auctionService'
 import { DEMO_AUCTIONS } from '@/data/demoAuctions'
 import { storageGet, storageSet } from '@/lib/storage'
+import { fetchPrices as fetchNexusPrices } from '@/services/nexusHub'
 
 interface AuctionState {
   entries: AuctionEntry[]
@@ -16,6 +17,7 @@ interface AuctionState {
   loading: boolean
   initialize: () => Promise<void>
   addEntries: (entries: AuctionEntry[], session: ImportSession) => Promise<void>
+  fetchWebPrices: (realmSlug: string) => Promise<number>
   setPriceSource: (source: PriceSource) => void
   setManualPrice: (itemName: string, price: number) => Promise<void>
   removeManualPrice: (itemName: string) => Promise<void>
@@ -138,6 +140,55 @@ export const useAuctionStore = create<AuctionState>()((set, get) => ({
       useDemoData: false,
     })
     storageSet('use-demo-data', false)
+  },
+
+  fetchWebPrices: async (realmSlug) => {
+    set({ loading: true })
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return 0
+
+      const webData = await fetchNexusPrices(realmSlug)
+      if (!webData || webData.length === 0) return 0
+
+      const newEntries: AuctionEntry[] = webData.map(item => ({
+        id: `web-${item.itemId}`,
+        itemName: item.name,
+        quantity: item.quantity || 1,
+        buyoutPrice: item.minBuyout || item.marketValue,
+        unitPrice: item.minBuyout || item.marketValue,
+        seller: 'NexusHub',
+        timeLeft: '',
+        scanDate: item.lastCheck,
+      }))
+
+      // For web prices, we treat them as a special high-priority import
+      // We'll clear previous 'NexusHub' entries for this user
+      await supabase.from('auction_entries').delete().eq('user_id', user.id).eq('seller', 'NexusHub')
+
+      const CHUNK = 500
+      for (let i = 0; i < newEntries.length; i += CHUNK) {
+        await supabase.from('auction_entries').insert(
+          newEntries.slice(i, i + CHUNK).map(e => toDbEntry(e, user.id, null))
+        )
+      }
+
+      const otherEntries = get().entries.filter(e => e.seller !== 'NexusHub')
+      const all = [...otherEntries, ...newEntries]
+      
+      set({
+        entries: all,
+        summaries: buildSummaries(all),
+        loading: false,
+        useDemoData: false
+      })
+      storageSet('use-demo-data', false)
+      return newEntries.length
+    } catch (e) {
+      console.error('Failed to fetch web prices:', e)
+      set({ loading: false })
+      throw e
+    }
   },
 
   setPriceSource: (source) => {

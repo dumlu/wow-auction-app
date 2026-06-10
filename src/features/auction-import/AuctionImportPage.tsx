@@ -1,11 +1,13 @@
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Upload, FileText, CheckCircle, AlertCircle, Trash2 } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Upload, FileText, CheckCircle, AlertCircle, Trash2, Globe, RefreshCw } from "lucide-react"
 import { useAuctionStore } from "@/store/auctionStore"
 import { parseAuctionatorLua, parseAuctionCSV } from "@/lib/luaParser"
 import type { AuctionEntry, ImportSession } from "@/types/auction"
+import { fetchRealms, type NexusHubRealm } from "@/services/nexusHub"
 
 function generateId(): string {
   if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
@@ -18,10 +20,28 @@ function generateId(): string {
 }
 
 export function AuctionImportPage() {
-  const { sessions, useDemoData, toggleDemoData, clearAll, addEntries, entries } = useAuctionStore()
+  const { sessions, useDemoData, toggleDemoData, clearAll, addEntries, entries, fetchWebPrices } = useAuctionStore()
   const [importing, setImporting] = useState(false)
   const [lastResult, setLastResult] = useState<{ success: boolean; message: string; details?: string } | null>(null)
+  const [realms, setRealms] = useState<NexusHubRealm[]>([])
+  const [selectedRealm, setSelectedRealm] = useState<string>('thunderstrike-horde')
   const fileRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    fetchRealms().then(setRealms).catch(console.error)
+  }, [])
+
+  async function handleWebUpdate() {
+    setImporting(true)
+    setLastResult(null)
+    try {
+      const count = await fetchWebPrices(selectedRealm)
+      setLastResult({ success: true, message: `Successfully updated ${count} prices from NexusHub for ${selectedRealm}` })
+    } catch (e) {
+      setLastResult({ success: false, message: `Failed to fetch web prices: ${e instanceof Error ? e.message : String(e)}` })
+    }
+    setImporting(false)
+  }
 
   async function handleFile(file: File) {
     setImporting(true)
@@ -110,6 +130,51 @@ export function AuctionImportPage() {
         <h1 className="text-2xl font-bold">Auction Import</h1>
         <p className="text-muted-foreground text-sm mt-1">Import your Auctionator saved variables or CSV export</p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Automatic Web Update</CardTitle>
+              <CardDescription>Fetch latest market prices from NexusHub API</CardDescription>
+            </div>
+            <Globe className="h-5 w-5 text-muted-foreground" />
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <Select value={selectedRealm} onValueChange={setSelectedRealm}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select realm" />
+                </SelectTrigger>
+                <SelectContent>
+                  {realms.length > 0 ? (
+                    realms.map(r => (
+                      <SelectItem key={`${r.slug}-${r.faction}`} value={`${r.slug}-${r.faction}`}>
+                        {r.name} - {r.faction.charAt(0).toUpperCase() + r.faction.slice(1)} ({r.region.toUpperCase()})
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="thunderstrike-horde">Thunderstrike - Horde</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button 
+              onClick={handleWebUpdate} 
+              disabled={importing}
+              className="min-w-[140px]"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${importing ? 'animate-spin' : ''}`} />
+              Update Prices
+            </Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground italic">
+            * Web prices will overwrite previous web data and supplement your Auctionator history.
+          </p>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
